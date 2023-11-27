@@ -15,7 +15,7 @@ class CFGGraph:
         G = nx.MultiDiGraph()
         for node in CFG_node_list:
             label = str(node[1]+1) + "_ " + node[2]
-            G.add_node(node[0], label=label, type_label=node[3])
+            G.add_node(node[0], label=label, type_label=node[3], lineno=node[1]+1, content=node[2])
         for edge in CFG_edge_list:
             additional_data = None
             if len(edge) == 4:

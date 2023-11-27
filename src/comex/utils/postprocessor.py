@@ -19,7 +19,7 @@ def write_networkx_to_json(graph, filename):
     graph_json = json_graph.node_link_data(graph)
     if not os.getenv("GITHUB_ACTIONS"):
         with open(filename, "w") as f:
-            json.dump(graph_json, f)
+            json.dump(graph_json, f, indent=4)
     return graph_json
 
 
