@@ -28,18 +28,30 @@ class CombinedDriver:
                 self.src_language, self.src_code, "", self.codeviews
             )
             self.DFG = self.results["DFG"].graph
+            if output_file:
+                postprocessor.write_to_dot(
+                    self.DFG, "debug/" + output_file.split(".")[0] + "_dfg.dot", output_png=True
+                )
 
         if self.codeviews["AST"]["exists"] == True:
             self.results["AST"] = ASTDriver(
                 self.src_language, self.src_code, "", self.codeviews["AST"]
             )
             self.AST = self.results["AST"].graph
+            if output_file:
+                postprocessor.write_to_dot(
+                    self.AST, "debug/" + output_file.split(".")[0] + "_ast.dot", output_png=True
+                )
 
         if self.codeviews["CFG"]["exists"] == True:
             self.results["CFG"] = CFGDriver(
                 self.src_language, self.src_code, "", self.codeviews["CFG"]
             )
             self.CFG = self.results["CFG"].graph
+            if output_file:
+                postprocessor.write_to_dot(
+                    self.CFG, "debug/" + output_file.split(".")[0] + "_cfg.dot", output_png=True
+                )
 
         self.combine()
         if output_file:
@@ -49,7 +61,7 @@ class CombinedDriver:
                 )
             if graph_format == "all" or graph_format == "dot":
                 postprocessor.write_to_dot(
-                    self.graph, output_file.split(".")[0] + ".dot", output_png=True
+                    self.graph, "debug/" + output_file.split(".")[0] + ".dot", output_png=True
                 )
 
     def get_graph(self):

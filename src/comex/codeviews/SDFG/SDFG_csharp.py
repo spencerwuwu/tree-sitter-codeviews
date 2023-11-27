@@ -1164,13 +1164,13 @@ def dfg_csharp(properties, CFG_results):
                                    declaration=True,
                                    method_call=True))
         end_alias_analysis_time = time.time()
-    # print_table(index, rda_table)
     start_rda_time = time.time()
     rda_solution = start_rda(index, rda_table, cfg_graph)
     final_graph = get_required_edges_from_def_to_use(index, cfg_graph, rda_solution, rda_table,
                                                      cfg_graph.nodes, all_classes, additional_edges, processed_edges,
                                                      pre_solve=False, properties=properties)
     end_rda_time = time.time()
+    print_table(index, rda_table)
     if debug:
         logger.warning("RDA init, presolve, alias, rda: {}, {}, {}, {}", end_rda_init_time - start_rda_init_time,
                        end_rda_presolve_time - start_rda_presolve_time,
