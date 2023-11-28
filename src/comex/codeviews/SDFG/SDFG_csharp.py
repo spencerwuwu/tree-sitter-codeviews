@@ -693,6 +693,8 @@ def dfg_csharp(properties, CFG_results):
     tree = parser.tree
     assignment = ["assignment_expression"]
     def_statement = ["variable_declarator"]
+    # TODO: Dereference is also a prefix_unary_expression
+    #       works anyway as I am just getting tainted results (include both def and use)
     increment_statement = ["postfix_unary_expression", "prefix_unary_expression"]
     variable_type = ['identifier', 'this_expression']
     method_calls = ["invocation_expression"]
@@ -700,8 +702,11 @@ def dfg_csharp(properties, CFG_results):
     switch_type = ['switch_expression', 'switch_statement']
     # switch_cases = ['switch_expression_arm', 'switch_section']
 
+    element_access = ['element_access_expression']
+
     method_declaration = ['method_declaration']
-    handled_types = assignment + def_statement + increment_statement + method_calls + method_declaration + switch_type
+    handled_types = assignment + def_statement + increment_statement + method_calls + method_declaration + switch_type \
+                        + element_access
 
     method_invocation = method_calls + ["object_creation_expression", "explicit_constructor_invocation"]
 
@@ -922,7 +927,17 @@ def dfg_csharp(properties, CFG_results):
             if operator_text != "=":
                 right_nodes.append(left_nodes)
             # TODO triage
-            add_entry(parser, rda_table, parent_id, defined=left_nodes)
+            #add_entry(parser, rda_table, parent_id, defined=left_nodes)
+            # TODO: used and defined all elements on lhs anyway
+            if left_nodes.type in variable_type:
+                add_entry(parser, rda_table, parent_id, used=left_nodes)
+                add_entry(parser, rda_table, parent_id, defined=left_nodes)
+            else:
+                identifiers_used = recursively_get_children_of_types(left_nodes, variable_type, index=parser.index,
+                                                                     check_list=parser.symbol_table["scope_map"])
+                for identifier in identifiers_used:
+                    add_entry(parser, rda_table, parent_id, used=identifier)
+                    add_entry(parser, rda_table, parent_id, defined=identifier)
             for node in right_nodes:
                 if node.type in variable_type:
                     add_entry(parser, rda_table, parent_id, used=node)
@@ -931,6 +946,31 @@ def dfg_csharp(properties, CFG_results):
                                                                          check_list=parser.symbol_table["scope_map"])
                     for identifier in identifiers_used:
                         add_entry(parser, rda_table, parent_id, used=identifier)
+        elif root_node.type in element_access:
+            parent_statement = return_first_parent_of_types(root_node, statement_types["node_list_type"])
+            parent_id = get_index(parent_statement, index)
+            pointer = root_node.children[0]
+            if pointer.type in variable_type:
+                add_entry(parser, rda_table, parent_id, used=pointer)
+                add_entry(parser, rda_table, parent_id, defined=pointer)
+            else:
+                identifiers_used = recursively_get_children_of_types(pointer, variable_type, index=parser.index,
+                                                                     check_list=parser.symbol_table["scope_map"])
+                for identifier in identifiers_used:
+                    add_entry(parser, rda_table, parent_id, used=identifier)
+                    add_entry(parser, rda_table, parent_id, defined=identifier)
+            # NOTE: index: bracketed_argument_list -> argument -> xxx
+            ptr_index = root_node.children[1].children[0]
+            if ptr_index.type in variable_type:
+                add_entry(parser, rda_table, parent_id, used=ptr_index)
+                add_entry(parser, rda_table, parent_id, defined=ptr_index)
+            else:
+                identifiers_used = recursively_get_children_of_types(ptr_index, variable_type, index=parser.index,
+                                                                     check_list=parser.symbol_table["scope_map"])
+                for identifier in identifiers_used:
+                    add_entry(parser, rda_table, parent_id, used=identifier)
+                    add_entry(parser, rda_table, parent_id, defined=identifier)
+                
         elif root_node.type in increment_statement:
             parent_statement = return_first_parent_of_types(root_node, statement_types["node_list_type"])
             parent_id = get_index(parent_statement, index)
