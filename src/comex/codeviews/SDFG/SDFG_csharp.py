@@ -521,6 +521,32 @@ def start_rda(index, rda_table, graph, pre_solve=False):
 
 
 def add_edge(final_graph, a, b, attrib=None, pre_solve=False):
+    # Ignore pre_solve
+    if attrib:
+        if final_graph.has_edge(a, b):
+            orig_attrib = final_graph.get_edge_data(a, b)[0]
+            if "used_def" not in orig_attrib or "used_def" not in attrib:
+                # Don't change this behavior
+                final_graph.add_edge(a, b)
+                nx.set_edge_attributes(final_graph, {(a, b, 0): attrib})
+            else:
+                orig_edges = orig_attrib["used_def"].split(",")
+                if attrib["used_def"] not in orig_edges:
+                    orig_edges.append(attrib["used_def"])
+                    orig_attrib["used_def"] = ",".join(orig_edges)
+                    nx.set_edge_attributes(final_graph, {(a, b, 0): orig_attrib})
+                else:
+                    # already recored data
+                    pass
+        else:
+            final_graph.add_edge(a, b)
+            nx.set_edge_attributes(final_graph, {(a, b, 0): attrib})
+    elif not final_graph.has_edge(a, b):
+        final_graph.add_edge(a, b)
+
+
+
+def legacy_add_edge(final_graph, a, b, attrib=None, pre_solve=False):
     if (pre_solve and attrib) or not final_graph.has_edge(a, b):
         final_graph.add_edge(a, b)
         if attrib is not None:
