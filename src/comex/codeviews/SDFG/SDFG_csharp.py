@@ -215,7 +215,41 @@ def return_first_parent_of_types(node, parent_types, stop_types=None):
 #     return resulting_list
 
 
-def set_add(lst, item):
+def set_add(lst, item, virtual_root=None):
+    if (virtual_root is not None and not item.method_call):
+        # Check if this item is first "declared" or in virtual "def" already
+        if item.line is not None:
+            search = False
+            for entry in virtual_root["def"]:
+                if entry.name == item.name:
+                    search = True
+                    break
+            if not search:
+                # Place in declared if haven't
+                search = False
+                for entry in virtual_root["declared"]:
+                    if entry.name == item.name:
+                        search = True
+                        break
+                if not search:
+                    virtual_root["declared"].append(item)
+        else:
+            # check in declared
+            declared = False
+            for entry in virtual_root["declared"]:
+                if entry.name == item.name:
+                    declared = True
+                    break
+            if not declared:
+                # See if alread in virtual_root
+                search = False
+                for entry in virtual_root["def"]:
+                    if entry == item:
+                        search = True
+                        break
+                if not search:
+                    virtual_root["def"].append(item)
+
     for entry in lst:
         if item == entry:
             return
@@ -247,6 +281,8 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
     mapped_node = None
     if core is None:
         current_node = used or defined
+        if current_node is None:
+            return
         if current_node.type == "member_access_expression":
             current_node = recursively_get_children_of_types(current_node, ['identifier'], index=parser.index,
                                                              check_list=parser.symbol_table["scope_map"])[-1]
@@ -256,7 +292,8 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
                 used = current_node
         if (
                 current_node.parent is not None
-                and current_node.parent.type == "member_access_expression"
+                # TODO: my comment out 
+                #and current_node.parent.type == "member_access_expression"
         ):
             # LOOK AT THE SYMBOL TABLE COMMENT AS WELL #? TODO
             # object_node = current_node.parent.child_by_field_name("name")
@@ -270,7 +307,18 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
                     and current_node.parent.type == "member_access_expression"
             ):
                 current_node = current_node.parent
+            while (
+                    current_node.parent is not None
+                    and current_node.parent.type == "pointer_type"
+            ):
+                current_node = current_node.parent
 
+            if (
+                current_node.parent is not None
+                and (current_node.parent.type == "local_function_statement" 
+                    or current_node.parent.type == "parameter")
+                ):
+                return
             if (
                     current_node.parent is not None
                     and current_node.parent.type == "invocation_expression"
@@ -282,16 +330,18 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
                         #         Identifier(parser, (used or defined).parent.named_children[0], statement_id, full_ref=None,
                         #                    # declaration=True,
                         #                    method_call=True))
-                    add_entry(parser, rda_table, statement_id, defined=used or defined, core=method_cs,
-                              # declaration=True,
-                              method_call=True)
+                    # TODO: my comment out 
+                    #add_entry(parser, rda_table, statement_id, defined=used or defined, core=method_cs,
+                    #          # declaration=True,
+                    #          method_call=True)
                     add_entry(parser, rda_table, statement_id, used=used or defined, core=method_cs,
                               # declaration=True,
                               method_call=True)
                 if mapped_node is not None:
                     set_add(rda_table[statement_id]["def"],
                             Identifier(parser, mapped_node, statement_id, full_ref=mapped_node, declaration=declaration,
-                                       method_call=method_call))
+                                       method_call=method_call),
+                            rda_table[-1])
                 return
             if defined is not None:
                 add_entry(parser, rda_table, statement_id, defined=defined, core=current_node, declaration=declaration,
@@ -299,18 +349,19 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
                 if mapped_node is not None:
                     set_add(rda_table[statement_id]["def"],
                             Identifier(parser, mapped_node, statement_id, full_ref=mapped_node, declaration=declaration,
-                                       method_call=method_call))
+                                       method_call=method_call),
+                            rda_table[-1])
             else:
                 add_entry(parser, rda_table, statement_id, used=used, core=current_node, declaration=declaration,
                           method_call=method_call)
             return
-        elif current_node.next_sibling and current_node.next_sibling.type == "." and current_node.parent is not None and current_node.parent.type == "invocation_expression":
-            if not st(current_node).startswith(system_type):
-                if (used or defined).type == "identifier":
-                    set_add(rda_table[statement_id]["def"],
-                            Identifier(parser, used or defined, statement_id, full_ref=None,
-                                       # declaration=True,
-                                       method_call=True))
+        #elif current_node.next_sibling and current_node.next_sibling.type == "." and current_node.parent is not None and current_node.parent.type == "invocation_expression":
+        #    if not st(current_node).startswith(system_type):
+        #        if (used or defined).type == "identifier":
+        #            set_add(rda_table[statement_id]["def"],
+        #                    Identifier(parser, used or defined, statement_id, full_ref=None,
+        #                               # declaration=True,
+        #                               method_call=True))
     if st(core).startswith(system_type):
         return
     if defined is not None:
@@ -318,20 +369,24 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
             return
         set_add(rda_table[statement_id]["def"],
                 Identifier(parser, defined, statement_id, full_ref=core, declaration=declaration,
-                           method_call=method_call))
+                           method_call=method_call),
+                rda_table[-1])
         if mapped_node is not None:
             set_add(rda_table[statement_id]["def"],
                     Identifier(parser, mapped_node, statement_id, full_ref=mapped_node, declaration=declaration,
-                               method_call=method_call))
+                               method_call=method_call),
+                    rda_table[-1])
     else:
         if get_index(used, parser.index) not in parser.symbol_table["scope_map"]:
             return
         if mapped_node is not None and method_call:
             set_add(rda_table[statement_id]["def"],
                     Identifier(parser, mapped_node, statement_id, full_ref=mapped_node, declaration=declaration,
-                               method_call=method_call))
+                               method_call=method_call),
+                    rda_table[-1])
         set_add(rda_table[statement_id]["use"],
-                Identifier(parser, used, full_ref=core, declaration=declaration, method_call=method_call))
+                Identifier(parser, used, full_ref=core, declaration=declaration, method_call=method_call),
+                rda_table[-1])
 
 
 def check_field_name(req_child):
@@ -576,7 +631,7 @@ def get_required_edges_from_def_to_use(index, cfg, rda_solution, rda_table, grap
     #     # if edge_data["label"] in twin_edges:
     #     #     twins.append(edge)
     final_graph.remove_edges_from(list(final_graph.edges()))
-    for node in graph_nodes:
+    for node in list(graph_nodes):
         rda_info = rda_table[node] if node in rda_table else None
         if rda_info is not None:
             use_info = rda_info["use"]
@@ -872,6 +927,7 @@ def dfg_csharp(properties, CFG_results):
                     add_edge(cfg_graph, descendant, get_index(class_method, index))
 
     rda_table = {}
+    rda_table[-1] = {"def": [], "declared": [], "use": []}
     for root_node in traverse_tree(tree, variable_type):
         if not root_node.is_named:
             if root_node.type == "while" and root_node.parent.type == "do_statement":
@@ -1228,7 +1284,8 @@ def dfg_csharp(properties, CFG_results):
                 set_add(rda_table[leaf]["def"],
                         Identifier(parser, mapped_node, leaf, full_ref=mapped_node,
                                    declaration=True,
-                                   method_call=True))
+                                   method_call=True),
+                        rda_table[-1])
         end_alias_analysis_time = time.time()
     start_rda_time = time.time()
     rda_solution = start_rda(index, rda_table, cfg_graph)
@@ -1236,6 +1293,33 @@ def dfg_csharp(properties, CFG_results):
                                                      cfg_graph.nodes, all_classes, additional_edges, processed_edges,
                                                      pre_solve=False, properties=properties)
     end_rda_time = time.time()
+
+    # Create link for "used" but no in-edge
+    virtual_roots = [f"'{ele.name}'" for ele in rda_table[-1]['def']]
+    label_name = "0_ " + ", ".join(virtual_roots)
+    final_graph.add_node(-1, type_label="virtual_root", label=label_name, lineno=-1, content='-')
+    for node in final_graph.nodes():
+        if node == -1:
+            continue
+        rda_info = rda_table[node] if node in rda_table else None
+        if not rda_info:
+            continue
+        in_edges = []
+        for edge in final_graph.in_edges(node, data=True):
+            for ele in edge[2]["used_def"].split(","):
+                if ele not in in_edges:
+                    in_edges.append(ele)
+        to_adds = []
+        for use in rda_info["use"]:
+            if use.method_call:
+                continue
+            name = f"'{use.name}'"
+            if name not in in_edges and name in virtual_roots:
+                to_adds.append(name)
+        if to_adds:
+            final_graph.add_edge(-1, node, used_def=",".join(to_adds))
+
+
     #print_table(index, rda_table)
     if debug:
         logger.warning("RDA init, presolve, alias, rda: {}, {}, {}, {}", end_rda_init_time - start_rda_init_time,
