@@ -792,7 +792,7 @@ def dfg_csharp(properties, CFG_results):
     method_invocation = method_calls + ["object_creation_expression", "explicit_constructor_invocation"]
 
     call_variable_map = {}
-    handled_cases = ["switch_section", "local_declaration_statement"] + ["class_declaration"]
+    handled_cases = ["switch_section", "local_declaration_statement"] + ["class_declaration"] + ["local_function_statement"]
 
     # if_statement = ["if_statement", "else"]
     # for_statement = ["for_statement"]
@@ -1110,6 +1110,11 @@ def dfg_csharp(properties, CFG_results):
             elif parent_statement.type == 'switch_statement':
                 case_node = parent_statement.child_by_field_name("value")
                 add_entry(parser, rda_table, parent_id, used=case_node)
+        elif root_node.type == "case_switch_label":
+            root_id = get_index(root_node, index)
+            if root_id not in CFG_results.graph.nodes:
+                continue
+            add_entry(parser, rda_table, root_id, used=root_node.children[1])
         elif root_node.type == "for_each_statement":
             parent_statement = root_node
             parent_id = get_index(root_node, index)

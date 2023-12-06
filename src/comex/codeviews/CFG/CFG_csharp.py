@@ -1647,27 +1647,30 @@ class CFGGraph_csharp(CFGGraph):
                                         block_node = child
                                     break
 
-                            # last_line_index = self.index[
-                            #     (block_node.start_point, block_node.end_point, block_node.type)]
-                            # if block_node.type in self.statement_types['non_control_statement']:
-                            #     # print(block_node.text.decode('UTF-8'))
-                            #     self.add_edge(last_line_index, next_case_node_index, 'fall through')
+                            last_line_index = self.index[
+                                (block_node.start_point, block_node.end_point, block_node.type)]
+                            #if block_node.type in self.statement_types['non_control_statement']:
+                            #    # print(block_node.text.decode('UTF-8'))
+                            #    self.add_edge(last_line_index, next_case_node_index, 'fall through')
+
+                            if block_node.type not in self.statement_types['non_control_statement']:
+                                continue
 
                             # in case of default, add an edge to the next statement outside the switch
                             # in case of no default, add an edge from last block to the next statement outside the switch
                             if next_case_node_index is None:
                                 # This is the last block
-                                if (
-                                        block_node.type
-                                        in self.statement_types["non_control_statement"]
-                                ):
-                                    self.add_edge(
-                                        last_line_index, next_dest_index, "switch_out"
-                                    )
+                                self.add_edge(
+                                    last_line_index, next_dest_index, "switch_out"
+                                )
+                            else:
+                                for eq_case in self.records["switch_equivalent_map"][next_case_node_index]:
+                                    self.add_edge(last_line_index, eq_case, 'fall_through')
                             # case_label = list(filter(lambda child : child.type == 'switch_label', v.children))
                             # if case_label == 'default':
                             #     default_exists = True
 
+                # Seems to be for  "switch_expression_arm":
                 for k, v in case_node_list.items():
                     current_case_index = self.index[k]
                     parent = v.parent
