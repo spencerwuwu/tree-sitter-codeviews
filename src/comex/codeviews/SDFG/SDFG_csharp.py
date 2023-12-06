@@ -216,6 +216,14 @@ def return_first_parent_of_types(node, parent_types, stop_types=None):
 
 
 def set_add(lst, item, virtual_root=None):
+    # Patch for switch-case label issue
+    # Test if number
+    if item.name.isdigit():
+        return
+    # Test if string
+    if '"' in item.name or "'" in item.name:
+        return
+    
     if (virtual_root is not None and not item.method_call):
         # Check if this item is first "declared" or in virtual "def" already
         if item.line is not None:
@@ -1070,6 +1078,8 @@ def dfg_csharp(properties, CFG_results):
                 for identifier in identifiers_used:
                     add_entry(parser, rda_table, parent_id, used=identifier)
                     add_entry(parser, rda_table, parent_id, defined=identifier)
+        elif root_node.type == "labeled_statement":
+            continue
         elif root_node.type in method_calls:
             parent_statement = return_first_parent_of_types(root_node, statement_types["node_list_type"])
             parent_id = get_index(parent_statement, index)
