@@ -24,6 +24,7 @@ class ASTDriver:
             self.parser,
         )
         self.graph = self.AST.graph
+        self.orig_nodes = self.AST.orig_nodes
         if output_file:
             self.json = postprocessor.write_networkx_to_json(self.graph, output_file)
             postprocessor.write_to_dot(

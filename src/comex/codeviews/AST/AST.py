@@ -14,6 +14,7 @@ class ASTGraph:
         self.method_map = self.parser.method_map
         self.method_calls = self.parser.method_calls
         self.start_line = self.parser.start_line
+        self.orig_nodes = {}
         self.graph = self.to_networkx()
 
     def get_AST_nodes(self, root_node, AST, AST_index):
@@ -41,6 +42,7 @@ class ASTGraph:
                     child_id = self.get_AST_nodes(child, AST, AST_index)
                     if child_id != None:
                         AST.add_edge(current_node_id, child_id)
+            self.orig_nodes[current_node_id] = root_node
             return current_node_id
 
     def merge_nodes(self, G, nodes, new_node):
