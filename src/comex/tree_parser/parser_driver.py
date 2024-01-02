@@ -1,5 +1,6 @@
 from ..tree_parser.java_parser import JavaParser
 from ..tree_parser.cs_parser import CSParser
+from ..tree_parser.cpp_parser import CPPParser
 from ..utils import preprocessor
 
 class ParserDriver:
@@ -13,6 +14,7 @@ class ParserDriver:
         self.parser_map = {
             "java": JavaParser,
             "cs": CSParser,
+            "cpp": CPPParser,
             # 'python': PythonParser
             # Add more languages here
         }
