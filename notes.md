@@ -1,21 +1,23 @@
 ## C-Sharp to CPP
 - Cool and right function parameters
 - Direct subsitution
-    - parameter -> parameter_declaration
+    - c parameter -> parameter_declaration
     - block -> compound_statement
-    - local_declaration -> declaration
-    - inovcation_expression -> call_expression
-    - member_access_expression -> field_expression
-    - element_access_expression -> subscript_expression
+    - c local_declaration_statement -> declaration
+    - invocation_expression -> call_expression
+    - variable_declarator -> init_declarator
+    - c member_access_expression -> field_expression
+    - c element_access_expression -> subscript_expression
 
+c
 ```
 local_function_statement -> []
 ---
 function_definition
 ```
-
+c
 ```
-variable_declaration -> []
+variable_declaration -> [] 
 ---
 declaration
 ```

@@ -1611,7 +1611,11 @@ class CFGGraph_cpp(CFGGraph):
                             # The case body exists
                             # Find the first line in each case block and add an edge from case label to it
                             block_node = None
-                            for child_node in v.named_children[1:]:
+                            if v.children[0].type == "case":
+                                named_children = v.named_children[1:]
+                            else:
+                                named_children = v.named_children
+                            for child_node in named_children:
                                 # Need to write a loop for unlimited layers of nesting
                                 if "compound_statement" in child_node.type:
                                     block_node = child_node.named_children[0]

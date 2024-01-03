@@ -41,7 +41,7 @@ control_statements = loop_control_statements + [
     "switch_expression",
     "switch_statement",
     "switch_expression_arm",
-    "switch_section",
+    "case_statement", #"switch_section",
     "lock_statement",  # 'synchronized_statement',
     "try_statement",
     # 'try_with_resources_statement'
@@ -484,7 +484,7 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
             elif root_node.type == "switch_expression_arm":
                 label = root_node.text.decode("UTF-8")
                 type_label = "case_expression"
-            elif root_node.type == "switch_section":
+            elif root_node.type == "case_statement":
                 type_label = "case"
                 current_case_index = index[
                     (root_node.start_point, root_node.end_point, root_node.type)
@@ -500,32 +500,44 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
                         parent_switch.type,
                     )
                 ]
-                for equivalent_label in root_node.named_children:
-                    if "label" in equivalent_label.type:
-                        label = equivalent_label.text.decode("UTF-8").rsplit(":", 1)[0].strip()
-                        label_index = index[
-                            (
-                                equivalent_label.start_point,
-                                equivalent_label.end_point,
-                                equivalent_label.type,
-                            )
-                        ]
-                        if parent_switch_index not in records["label_switch_map"]:
-                            records["label_switch_map"][parent_switch_index] = {}
-                        records["label_switch_map"][parent_switch_index][
-                            label
-                        ] = label_index
-                        records["switch_equivalent_map"][current_case_index].append(
-                            label_index
+                case_label = root_node.children[0]
+                if case_label.type == "case":
+                    equivalent_label = root_node.named_children[0]
+                    label_index = index[(
+                            equivalent_label.start_point,
+                            equivalent_label.end_point,
+                            equivalent_label.type,
                         )
-                        graph_node_list.append(
-                            (
-                                label_index,
-                                equivalent_label.start_point[0],
-                                label,
-                                type_label,
-                            )
+                    ]
+                elif case_label.type == "default":
+                    equivalent_label = case_label
+                    label_index = max(index.values()) + 1
+                    index[
+                        (
+                            equivalent_label.start_point,
+                            equivalent_label.end_point,
+                            equivalent_label.type,
                         )
+                    ] = label_index
+                else:
+                    raise NotImplementedError
+                label = equivalent_label.text.decode("UTF-8").rsplit(":", 1)[0].strip()
+                if parent_switch_index not in records["label_switch_map"]:
+                    records["label_switch_map"][parent_switch_index] = {}
+                records["label_switch_map"][parent_switch_index][
+                    label
+                ] = label_index
+                records["switch_equivalent_map"][current_case_index].append(
+                    label_index
+                )
+                graph_node_list.append(
+                    (
+                        label_index,
+                        equivalent_label.start_point[0],
+                        label,
+                        type_label,
+                    )
+                )
 
             elif root_node.type == "try_statement":
                 # or root_node.type == 'try_with_resources_statement':
@@ -538,7 +550,7 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
             #     type_label = 'synchronized'
             elif root_node.type == "labeled_statement":
                 name = list(
-                    filter(lambda child: child.type == "identifier", root_node.children)
+                    filter(lambda child: child.type == "statement_identifier", root_node.children)
                 )
                 label = name[0].text.decode("UTF-8").strip()
                 records["label_statement_map"][label] = index[
@@ -581,7 +593,7 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
                 "method_declaration",
                 "constructor_declaration",
                 "property_declaration",
-                "switch_section",
+                "case_statement",
             ]:
                 graph_node_list.append(
                     (
