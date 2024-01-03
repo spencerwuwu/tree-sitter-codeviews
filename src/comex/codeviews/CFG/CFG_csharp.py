@@ -160,8 +160,8 @@ class CFGGraph_csharp(CFGGraph):
     def get_next_index(self, node_value):
         # If exiting a method, don't return
         next_node = node_value.next_named_sibling
-        # TODO: Check if "block" works or not
-        while next_node is not None and next_node.type == "block" and len(
+        # TODO: Check if "compound_statement" works or not
+        while next_node is not None and next_node.type == "compound_statement" and len(
                 list(filter(lambda child: child.is_named, next_node.children))) == 0:
             next_node = next_node.next_named_sibling
         # TODO: Check if check_inner_class works properly or not)
@@ -220,7 +220,7 @@ class CFGGraph_csharp(CFGGraph):
         if next_node.type in self.statement_types["definition_types"]:
             return 2, None
 
-        # if next_node.type == "block":
+        # if next_node.type == "compound_statement":
         #     for child in next_node.children:
         #         if child.is_named:
         #             next_node = child
@@ -229,7 +229,7 @@ class CFGGraph_csharp(CFGGraph):
         # return self.index[(next_node.start_point, next_node.end_point, next_node.type)]
         try:
             # WARNING: Might need to replace if with while
-            if next_node.type == "block":
+            if next_node.type == "compound_statement":
                 for child in next_node.children:
                     if child.is_named:
                         next_node = child
@@ -279,7 +279,7 @@ class CFGGraph_csharp(CFGGraph):
         body_node = current_node_value.child_by_field_name(body_type)
         if body_node is None:
             body_nodes = [
-                child for child in current_node_value.children if child.type == "block"
+                child for child in current_node_value.children if child.type == "compound_statement"
             ]
             if body_nodes:
                 body_node = body_nodes[0]
@@ -291,7 +291,7 @@ class CFGGraph_csharp(CFGGraph):
                 except:
                     body_node = current_node_value.named_children[-1]
         flag = False
-        while body_node.type == "block":
+        while body_node.type == "compound_statement":
             for child in body_node.children:
                 if child.is_named:
                     flag = True
@@ -339,7 +339,7 @@ class CFGGraph_csharp(CFGGraph):
         #         current_node_value.type,
         #     )
 
-        while block_node.type == "block":
+        while block_node.type == "compound_statement":
             named_children = list(
                 filter(
                     lambda child: child.is_named == True, reversed(block_node.children)
@@ -969,7 +969,7 @@ class CFGGraph_csharp(CFGGraph):
 
     def add_class_edge(self, node_value):
         class_attributes = ["field_declaration", "accessor_list"]
-        # Not included: ["record_declaration", "method_declaration","compact_constructor_declaration","class_declaration","interface_declaration","annotation_type_declaration","enum_declaration","block","static_initializer","constructor_declaration"]
+        # Not included: ["record_declaration", "method_declaration","compact_constructor_declaration","class_declaration","interface_declaration","annotation_type_declaration","enum_declaration","compound_statement","static_initializer","constructor_declaration"]
         current_index = self.get_index(node_value)
         current_node = node_value.child_by_field_name("body")
         flag = False
@@ -978,7 +978,7 @@ class CFGGraph_csharp(CFGGraph):
         for field in current_fields:
             if field.type == "accessor_list":
                 # Find the first line insdie the block
-                block = list(filter(lambda x: x.type == "block", field.children))[0]
+                block = list(filter(lambda x: x.type == "compound_statement", field.children))[0]
                 try:
                     field = list(filter(lambda x: x.is_named, block.children))[-1]
                 except:
@@ -1053,11 +1053,11 @@ class CFGGraph_csharp(CFGGraph):
                         next_node = node_value.next_named_sibling
                         if next_node is not None and next_node.type == "accessor_list":
                             try:
-                                child = list(filter(lambda x: x.type == "block", next_node.children))[0]
+                                child = list(filter(lambda x: x.type == "compound_statement", next_node.children))[0]
                                 next_node = child
                             except:
                                 pass
-                        while next_node is not None and next_node.type == "block" and len(
+                        while next_node is not None and next_node.type == "compound_statement" and len(
                                 list(filter(lambda child: child.is_named, next_node.children))) == 0:
                             next_node = next_node.next_named_sibling
                         # If it is a local class, skip it and go for the next node
@@ -1068,7 +1068,7 @@ class CFGGraph_csharp(CFGGraph):
                         # TODO: This might break next line, check all test cases
                         # if next_node is None and self.get_containing_method(node_value).type == "constructor_declaration": 
                         #     self.handle_next(node_value, None, "constructor_return")
-                        if next_node is None and node_value.parent.type == 'block':
+                        if next_node is None and node_value.parent.type == 'compound_statement':
                             next_node = self.return_next_node(node_value)
                             if next_node is None:
                                 continue
@@ -1079,7 +1079,7 @@ class CFGGraph_csharp(CFGGraph):
                                 self.add_edge(src_node, dest_node, "next_line $")
 
                         flag = False
-                        while next_node.type == "block" and len(next_node.named_children):
+                        while next_node.type == "compound_statement" and len(next_node.named_children):
                             for child in next_node.children:
                                 if child.is_named:
                                     if child.type in self.statement_types["node_list_type"]:
@@ -1099,7 +1099,7 @@ class CFGGraph_csharp(CFGGraph):
                         if check is False and next_node.type in self.statement_types[
                             'node_list_type'] and next_node.type not in self.statement_types["definition_types"]:
                             self.add_edge(src_node, dest_node, "next_line 1")
-                        # if next_node and next_node.type == "block":
+                        # if next_node and next_node.type == "compound_statement":
                         #     for child in next_node.children:
                         #         if child.type in self.statement_types["node_list_type"]:
                         #             self.add_edge(
@@ -1306,7 +1306,7 @@ class CFGGraph_csharp(CFGGraph):
                         self.handle_next(node_value, next_node, "next_line")
                 else:
                     # When else is not there add a direct edge from if node to the next statement
-                    # if node_value.parent.type == "block" and node_value.parent.parent.type == "do_statement":
+                    # if node_value.parent.type == "compound_statement" and node_value.parent.parent.type == "do_statement":
                     #     pass
                     # TODO FIX LOGIC IMP
                     # elif cs_nodes.return_index_of_first_parent_of_type(node_value, 'switch_section') is not None:
@@ -1354,7 +1354,7 @@ class CFGGraph_csharp(CFGGraph):
 
                 # Find the last line in the body block
                 last_line, line_type = self.get_block_last_line(
-                    node_value, "block"
+                    node_value, "compound_statement"
                 )
                 last_line_index = self.get_index(last_line)
                 # Search the CFG_node_list for parameterized_expression with parent do_statement with AST_id = src_node
@@ -1611,7 +1611,7 @@ class CFGGraph_csharp(CFGGraph):
                             block_node = None
                             for child_node in v.named_children[1:]:
                                 # Need to write a loop for unlimited layers of nesting
-                                if "block" in child_node.type:
+                                if "compound_statement" in child_node.type:
                                     block_node = child_node.named_children[0]
                                     break
                                 else:
@@ -1639,7 +1639,7 @@ class CFGGraph_csharp(CFGGraph):
                             for child in reversed(v.children):
                                 # Need to write a loop for unlimited layers of nesting
                                 if child.is_named:
-                                    if child.type == "block":
+                                    if child.type == "compound_statement":
                                         for child in reversed(child.children):
                                             if child.is_named:
                                                 block_node = child

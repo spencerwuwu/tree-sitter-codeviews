@@ -9,7 +9,7 @@
     - element_access_expression -> subscript_expression
 
 ```
-location_function_statement -> []
+local_function_statement -> []
 ---
 function_definition
 ```

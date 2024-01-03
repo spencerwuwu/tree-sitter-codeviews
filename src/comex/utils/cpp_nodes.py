@@ -4,7 +4,7 @@ scope_only_blocks = [
     "fixed_statement",
     "unsafe_statement",
     "using_statement",
-    "local_function_statement",
+    "function_definition",
 ]
 class_declaration_statements = [
     "constructor_declaration",
@@ -13,13 +13,13 @@ class_declaration_statements = [
     "class_declaration",
     "field_declaration",
     "struct_declaration",
-    "local_function_statement",
+    "function_statement",
     
 ]
 
 inner_node_type = [
     "empty_statement",
-    "local_declaration_statement",
+    "declaration", #"local_declaration_statement",
     # 'local_variable_declaration'
     # ! used in DFG graphcodebert - Swapped with local_declaration_statement
     # '_declaration',
@@ -546,7 +546,7 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
                 ]
                 type_label = "label"
 
-            elif root_node.type == "local_function_statement":
+            elif root_node.type == "function_definition":
                 label = ""
                 for child in root_node.children:
                     if not any(typ in child.type for typ in ["body", "compound_statement"]):
