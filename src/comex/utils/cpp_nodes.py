@@ -377,7 +377,7 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
 
             elif root_node.type == "if_statement":
                 condition = root_node.child_by_field_name("condition")
-                label = f"if ( {cl(condition)} )"
+                label = f"if {cl(condition)}"
                 type_label = "if"
             elif root_node.type == "unsafe_statement":
                 label = ""

@@ -64,7 +64,7 @@ class Identifier:
             self.name = self.unresolved_name
         if not self.name:
             self.name = self.unresolved_name
-        if node.parent.type == "field_expression":
+        if node.type == "field_expression":
             og_node = node.parent
             node = recursively_get_children_of_types(og_node, ['identifier'], index=parser.index,
                                                                  check_list=parser.symbol_table["scope_map"])[0]
@@ -342,9 +342,9 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
                     #add_entry(parser, rda_table, statement_id, defined=used or defined, core=method_cs,
                     #          # declaration=True,
                     #          method_call=True)
-                    add_entry(parser, rda_table, statement_id, used=used or defined, core=method_cs,
-                              # declaration=True,
-                              method_call=True)
+                        add_entry(parser, rda_table, statement_id, used=used or defined, core=method_cs,
+                                  # declaration=True,
+                                  method_call=True)
                 if mapped_node is not None:
                     set_add(rda_table[statement_id]["def"],
                             Identifier(parser, mapped_node, statement_id, full_ref=mapped_node, declaration=declaration,
@@ -785,13 +785,13 @@ def dfg_cpp(properties, CFG_results):
     # TODO: Dereference is also a prefix_unary_expression
     #       works anyway as I am just getting tainted results (include both def and use)
     increment_statement = ["postfix_unary_expression", "prefix_unary_expression"]
-    variable_type = ['identifier', 'this_expression']
     method_calls = ["call_expression"]
 
     switch_type = ['switch_expression', 'switch_statement']
     # switch_cases = ['switch_expression_arm', 'switch_section']
 
     element_access = ['subscript_expression']
+    variable_type = ['identifier', 'this_expression', "field_expression"] + element_access
 
     method_declaration = ['method_declaration']
     handled_types = assignment + def_statement + increment_statement + method_calls + method_declaration + switch_type \
@@ -982,8 +982,8 @@ def dfg_cpp(properties, CFG_results):
             else:
                 name = name_node.children[0]
                 value = name_node.children[1]
-            if name.type == "pointer_declarator":
-                name = [c for c in name.children if c.type][-1]
+            while name.type == "pointer_declarator":
+                name = [c for c in name.named_children if c.type][-1]
             add_entry(parser, rda_table, parent_id, defined=name, declaration=True)
             if value is not None:
                 identifiers_used = recursively_get_children_of_types(value, variable_type, index=parser.index,

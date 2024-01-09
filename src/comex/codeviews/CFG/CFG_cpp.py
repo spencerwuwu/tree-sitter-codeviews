@@ -291,6 +291,8 @@ class CFGGraph_cpp(CFGGraph):
                 except:
                     body_node = current_node_value.named_children[-1]
         flag = False
+        if body_node.type == "else_clause":
+            body_node = body_node.named_children[0]
         while body_node.type == "compound_statement":
             for child in body_node.children:
                 if child.is_named:
@@ -324,6 +326,9 @@ class CFGGraph_cpp(CFGGraph):
                         break
             else:
                 block_node = block_node[0]
+
+        if block_node.type == "else_clause":
+            block_node = block_node.named_children[0]
 
         if block_node.is_named is False:
             return (current_node_value, current_node_value.type)
@@ -1301,7 +1306,6 @@ class CFGGraph_cpp(CFGGraph):
                     last_line, line_type = self.get_block_last_line(
                         node_value, "alternative"
                     )
-                    # print(last_line_index, line_type)
                     if line_type in self.statement_types["non_control_statement"]:
                         self.handle_next(last_line, next_node, "next_line")
                     if empty_if and last_line_index == current_index:
