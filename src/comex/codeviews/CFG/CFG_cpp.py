@@ -396,7 +396,7 @@ class CFGGraph_cpp(CFGGraph):
                 
         types = ["scoped_type_identifier", "type_identifier", "generic_type"]
         if reference_node is None or reference_node.type == "this":
-            #class_name = None
+            class_name = None
             while node is not None:
                 if node.type == "class_declaration":
                     # class_index = self.get_index(node)
