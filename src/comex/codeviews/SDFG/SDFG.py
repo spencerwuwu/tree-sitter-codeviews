@@ -50,9 +50,10 @@ class DfgRda:
         self.CFG = self.CFG_Results.graph
         self.rda_table = None
         self.rda_result = None
+        self.var_types = {}
         # time to create the DFG
         start_dfg = time.time()
-        self.graph, self.debug_graph, self.rda_table, self.rda_result = self.rda(
+        self.graph, self.debug_graph, self.rda_table, self.rda_result, self.var_types = self.rda(
             self.properties["DFG"]
         )
         end_dfg = time.time()

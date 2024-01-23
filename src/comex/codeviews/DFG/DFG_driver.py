@@ -26,6 +26,7 @@ class DFGDriver:
             self.rda_table = result.rda_table
             self.rda_result = result.rda_result
             self.graph = result.graph
+            self.var_types = result.var_types
         if output_file:
             self.json = postprocessor.write_networkx_to_json(self.graph, output_file)
             postprocessor.write_to_dot(

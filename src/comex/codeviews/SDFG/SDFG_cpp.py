@@ -68,6 +68,10 @@ class Identifier:
             og_node = node.parent
             node = recursively_get_children_of_types(og_node, ['identifier'], index=parser.index,
                                                                  check_list=parser.symbol_table["scope_map"])[0]
+        if full_ref.type == "field_expression":
+            self.field_parent_name = full_ref.named_children[0].text.decode()
+        else:
+            self.field_parent_name = None
         variable_index = get_index(node, parser.index)
         self.variable_scope = parser.symbol_table["scope_map"][variable_index]
         if variable_index in parser.declaration_map:
@@ -232,6 +236,9 @@ def set_add(lst, item, virtual_root=None):
                 if entry.name == item.name:
                     search = True
                     break
+                if entry.field_parent_name and entry.field_parent_name == item.name:
+                    search = True
+                    break
             if not search:
                 # Place in declared if haven't
                 search = False
@@ -246,6 +253,9 @@ def set_add(lst, item, virtual_root=None):
             declared = False
             for entry in virtual_root["declared"]:
                 if entry.name == item.name:
+                    declared = True
+                    break
+                if entry.field_parent_name and entry.field_parent_name == item.name:
                     declared = True
                     break
             if not declared:
@@ -287,17 +297,22 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
     if not used and not defined:
         return
     mapped_node = None
+    current_node = used or defined
     if core is None:
         current_node = used or defined
         if current_node is None:
             return
         if current_node.type == "field_expression":
+            prev_node = current_node
             current_node = recursively_get_children_of_types(current_node, ['identifier'], index=parser.index,
                                                              check_list=parser.symbol_table["scope_map"])[-1]
             if defined is not None:
                 defined = current_node
             else:
                 used = current_node
+                set_add(rda_table[statement_id]["use"],
+                        Identifier(parser, used, full_ref=core, declaration=declaration, method_call=method_call),
+                        rda_table[-1])
         if (
                 current_node.parent is not None
                 # TODO: my comment out 
@@ -775,6 +790,83 @@ def call_variable(call_variable_map, node, edge_for, check_virtual=True):
     return None
 
 
+def handle_cpp_function_parameter(param_node):
+    named_children = param_node.named_children
+    idx = 0
+    if named_children[idx].type == "type_qualifier":
+        idx += 1
+    param_type = param_node.named_children[idx]
+    pointer_stars = 0
+    idx += 1
+    if idx == len(named_children):
+        value_node = None
+        return {
+            "type": param_type.text.decode(),
+            "pointer_stars": "*" * pointer_stars,
+            "name": None,
+            "name_node": value_node
+        }
+    value_node = param_node.named_children[idx]
+    while value_node.type == "pointer_declarator":
+        pointer_stars += 1
+        value_node = value_node.named_children[0]
+    return {
+        "type": param_type.text.decode(),
+        "pointer_stars": "*" * pointer_stars,
+        "name": value_node.text.decode(),
+        "name_node": value_node
+    }
+
+
+def analyze_variable_types(root_node):
+    var_types = {}
+    def _handle_parameter_type(node):
+        for param_dec in node.named_children:
+            if param_dec.type != "parameter_declaration":
+                raise NotImplementedError(f"Unknown type in parameter_list {param_dec.type}")
+            ret = handle_cpp_function_parameter(param_dec)
+            name = ret["name"]
+            var_types[name] = ret
+
+    def _handle_declaration(node):
+        idx = 0
+        named_children = node.named_children
+        if named_children[idx].type == "type_qualifier":
+            idx += 1
+        lhs_type_node =  node.named_children[idx]
+        idx += 1
+        while idx < len(named_children):
+            lhs_value_node = node.named_children[idx]
+            if lhs_value_node.type == "init_declarator":
+                lhs_value_node = lhs_value_node.named_children[0]
+            pointer_cnt = 0
+            while (lhs_value_node.type == "pointer_declarator"
+                or lhs_value_node.type == "array_declarator"):
+                pointer_cnt += 1
+                lhs_value_node = lhs_value_node.named_children[0]
+            ret = {
+                "type": lhs_type_node.text.decode(),
+                "pointer_stars": "*" * pointer_cnt,
+                "name": lhs_value_node.text.decode(),
+                "name_node": lhs_value_node
+            }
+            name = ret["name"]
+            var_types[name] = ret
+            idx += 1 
+
+    def _analyze_variable_types(node):
+        for child in node.named_children:
+            if child.type == "parameter_list":
+                _handle_parameter_type(child)
+            elif child.type == "declaration":
+                _handle_declaration(child)
+            else:
+                _analyze_variable_types(child)
+
+    _analyze_variable_types(root_node)
+    return var_types
+
+
 def dfg_cpp(properties, CFG_results):
     properties = properties
     parser = CFG_results.parser
@@ -972,24 +1064,47 @@ def dfg_cpp(properties, CFG_results):
                 if parent_statement and parent_statement.type in handled_cases:
                     continue
                 raise NotImplementedError
+            idx = 0
+            named_children = root_node.named_children
+            if named_children[idx].type == "type_qualifier":
+                idx += 1
+            #type_node =  node.named_children[idx]
+            idx += 1
+            while idx < len(named_children):
+                lhs_value_node = named_children[idx]
+                if lhs_value_node.type == "init_declarator":
+                    name  = lhs_value_node.named_children[0]
+                    value = lhs_value_node.named_children[1]
+                else:
+                    name  = lhs_value_node
+                    value = None
+                while name.type == "pointer_declarator":
+                    name = [c for c in name.named_children if c.type][-1]
+                add_entry(parser, rda_table, parent_id, defined=name, declaration=True)
+                if value is not None:
+                    identifiers_used = recursively_get_children_of_types(value, variable_type, index=parser.index,
+                                                                         check_list=parser.symbol_table["scope_map"])
+                    for identifier in identifiers_used:
+                        add_entry(parser, rda_table, parent_id, used=identifier)
+                idx += 1 
             # print(parent_id)
             # print(st(parent_statement))
-            name_node = [c for c in root_node.children if c.type != ";"][-1]
-            # Declaration without init
-            if name_node.type != "init_declarator":
-                name = name_node
-                value = None
-            else:
-                name = name_node.children[0]
-                value = name_node.children[1]
-            while name.type == "pointer_declarator":
-                name = [c for c in name.named_children if c.type][-1]
-            add_entry(parser, rda_table, parent_id, defined=name, declaration=True)
-            if value is not None:
-                identifiers_used = recursively_get_children_of_types(value, variable_type, index=parser.index,
-                                                                     check_list=parser.symbol_table["scope_map"])
-                for identifier in identifiers_used:
-                    add_entry(parser, rda_table, parent_id, used=identifier)
+            #name_node = [c for c in root_node.children if c.type != ";"][-1]
+            ## Declaration without init
+            #if name_node.type != "init_declarator":
+            #    name = name_node
+            #    value = None
+            #else:
+            #    name = name_node.children[0]
+            #    value = name_node.children[1]
+            #while name.type == "pointer_declarator":
+            #    name = [c for c in name.named_children if c.type][-1]
+            #add_entry(parser, rda_table, parent_id, defined=name, declaration=True)
+            #if value is not None:
+            #    identifiers_used = recursively_get_children_of_types(value, variable_type, index=parser.index,
+            #                                                         check_list=parser.symbol_table["scope_map"])
+            #    for identifier in identifiers_used:
+            #        add_entry(parser, rda_table, parent_id, used=identifier)
         elif root_node.type in assignment:
             parent_statement = return_first_parent_of_types(root_node, statement_types["node_list_type"])
             parent_id = get_index(parent_statement, index)
@@ -1101,6 +1216,9 @@ def dfg_cpp(properties, CFG_results):
                                                                          check_list=parser.symbol_table["scope_map"])
                     for identifier in identifiers_used:
                         add_entry(parser, rda_table, parent_id, used=identifier)
+                        if (identifier.parent.type == "pointer_expression"
+                                and identifier.parent.children[0].text.decode() == "&"):
+                            add_entry(parser, rda_table, parent_id, defined=identifier)
         elif root_node.type in method_declaration:
             parent_id = get_index(root_node, index)
             for child in root_node.named_children:
@@ -1351,5 +1469,8 @@ def dfg_cpp(properties, CFG_results):
                        end_alias_analysis_time - start_alias_analysis_time,
                        end_rda_time - start_rda_time)
     debug_graph = rda_cfg_map(rda_solution, CFG_results, remove_unused=False)
-    return final_graph, debug_graph, rda_table, rda_solution
+
+    var_types = analyze_variable_types(CFG_results.root_node)
+
+    return final_graph, debug_graph, rda_table, rda_solution, var_types
 
