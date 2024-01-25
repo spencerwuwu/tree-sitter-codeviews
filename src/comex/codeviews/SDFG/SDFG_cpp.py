@@ -430,19 +430,19 @@ def recursively_get_children_of_types(
         result = []
     if node.type in stop_types:
         return result
-    if check_list and index:
-        result.extend(
-            list(
-                filter(
-                    lambda child: child.type in st_types
-                                  and get_index(child, index) in check_list
-                                  and check_field_name(child),
-                    # and child.parent.type in ['declaration', 'object_creation_expression',
-                    #                           'field_expression'],
-                    node.children,
-                )
-            )
-        )
+    #if check_list and index:
+    #    result.extend(
+    #        list(
+    #            filter(
+    #                lambda child: child.type in st_types
+    #                              and get_index(child, index) in check_list
+    #                              and check_field_name(child),
+    #                # and child.parent.type in ['declaration', 'object_creation_expression',
+    #                #                           'field_expression'],
+    #                node.children,
+    #            )
+    #        )
+    #    )
     else:
         result.extend(list(filter(lambda child: child.type in st_types, node.children)))
         additional_cs = []
@@ -874,9 +874,8 @@ def dfg_cpp(properties, CFG_results):
     tree = parser.tree
     assignment = ["assignment_expression"]
     def_statement = ["declaration"]
-    # TODO: Dereference is also a prefix_unary_expression
-    #       works anyway as I am just getting tainted results (include both def and use)
-    increment_statement = ["postfix_unary_expression", "prefix_unary_expression"]
+    #increment_statement = ["postfix_unary_expression", "prefix_unary_expression"]
+    increment_statement = ["update_expression"]
     method_calls = ["call_expression"]
 
     switch_type = ['switch_expression', 'switch_statement']
@@ -1060,6 +1059,10 @@ def dfg_cpp(properties, CFG_results):
         if root_node.type in def_statement:
             parent_statement = return_first_parent_of_types(root_node, statement_types["node_list_type"])
             parent_id = get_index(parent_statement, index)
+            if parent_statement and parent_id not in CFG_results.graph.nodes:
+                gradparent = parent_statement.parent
+                if gradparent.type == "for_statement":
+                    parent_id = get_index(gradparent, index)
             if parent_id not in CFG_results.graph.nodes:
                 if parent_statement and parent_statement.type in handled_cases:
                     continue
@@ -1187,8 +1190,6 @@ def dfg_cpp(properties, CFG_results):
                 if parent_statement and parent_statement.type in handled_cases:
                     continue
                 raise NotImplementedError
-            # print(parent_id)
-            # print(st(parent_statement))
             if root_node.type in variable_type:
                 add_entry(parser, rda_table, parent_id, used=root_node)
             else:
@@ -1246,12 +1247,36 @@ def dfg_cpp(properties, CFG_results):
         #        add_entry(parser, rda_table, parent_id, used=case_node)
         # TODO: I'm giving up
         elif root_node.type == "case_statement":
-            if root_node.children[0].type == "case":
-                case_node = root_node.children[0]
-                case_id = get_index(case_node, index)
+            case_label = root_node.children[0]
+            if case_label.type == "case":
+                equivalent_label_node = root_node.named_children[0]
+                case_id = get_index(equivalent_label_node, index)
                 if case_id not in CFG_results.graph.nodes:
                     continue
-                add_entry(parser, rda_table, case_id, used=case_id)
+                add_entry(parser, rda_table, case_id, used=equivalent_label_node)
+            else:
+                # if case_label.type == "default"
+                pass
+        #elif root_node.type == "for_statement":
+        #    init = root_node.child_by_field_name("initializer")
+        #    condition = root_node.child_by_field_name("condition")
+        #    update = root_node.child_by_field_name("update")
+        #    if init:
+        #        print("init", init.type, st(init))
+        #    if condition:
+        #        print("condition", condition.type, st(condition))
+        #    if update:
+        #        print("update", update.type, st(update))
+        elif root_node.type in ["if_statement", "while_statement"]:
+            condition_node = root_node.child_by_field_name("condition")
+            cur_id = get_index(root_node, index)
+            for node in condition_node.named_children: 
+                if node.type in variable_type:
+                    add_entry(parser, rda_table, cur_id, used=node)
+                else:
+                    identifiers_used = recursively_get_children_of_types(node, variable_type, index=parser.index)
+                    for identifier in identifiers_used:
+                        add_entry(parser, rda_table, cur_id, used=node)
         elif root_node.type == "for_each_statement":
             parent_statement = root_node
             parent_id = get_index(root_node, index)

@@ -225,6 +225,7 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
             )
         )
     elif root_node.type == "catch_clause":
+        return
         node_list[
             (root_node.start_point, root_node.end_point, root_node.type)
         ] = root_node
@@ -243,6 +244,7 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
         )
 
     elif root_node.type == "finally_clause":
+        return
         node_list[
             (root_node.start_point, root_node.end_point, root_node.type)
         ] = root_node
@@ -477,8 +479,8 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
                 # if parent_statement is not None:
                 #     label = parent_statement.text.decode('UTF-8').split('{')[0]
                 # else:
-                lvalue = root_node.child_by_field_name("value")
-                label = f"switch ( {cl(lvalue)} )"
+                lvalue = root_node.child_by_field_name("condition")
+                label = f"switch {cl(lvalue)}"
                 type_label = "switch_statement"
 
             elif root_node.type == "switch_expression_arm":
@@ -521,7 +523,7 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
                     ] = label_index
                 else:
                     raise NotImplementedError
-                label = equivalent_label.text.decode("UTF-8").rsplit(":", 1)[0].strip()
+                label = root_node.text.decode("UTF-8").rsplit(":", 1)[0].strip()
                 if parent_switch_index not in records["label_switch_map"]:
                     records["label_switch_map"][parent_switch_index] = {}
                 records["label_switch_map"][parent_switch_index][
@@ -609,6 +611,8 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
     for child in root_node.children:
         # if child.parent.type == "local_declaration_statement":
         #     continue
+        if child.type in ["catch_clause", "finally_clause"]:
+            continue
         root_node, node_list, graph_node_list, records = get_nodes(
             root_node=child,
             node_list=node_list,
