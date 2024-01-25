@@ -311,8 +311,7 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
             else:
                 used = current_node
                 set_add(rda_table[statement_id]["use"],
-                        Identifier(parser, used, full_ref=core, declaration=declaration, method_call=method_call),
-                        rda_table[-1])
+                        Identifier(parser, used, full_ref=core, declaration=declaration, method_call=method_call))
         if (
                 current_node.parent is not None
                 # TODO: my comment out 
