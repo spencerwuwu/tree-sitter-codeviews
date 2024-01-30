@@ -437,7 +437,7 @@ def get_nodes(root_node=None, node_list={}, graph_node_list=[], index={}, record
                 init = root_node.child_by_field_name("initializer")
                 condition = root_node.child_by_field_name("condition")
                 update = root_node.child_by_field_name("update")
-                label = f"for ( {cl(init)} ; {cl(condition)} ; {cl(update)} )"
+                label = f"for ( {cl(init)} {cl(condition)} ; {cl(update)} )"
                 type_label = "for"
 
             elif root_node.type == "for_each_statement":
