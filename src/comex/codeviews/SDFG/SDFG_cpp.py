@@ -64,23 +64,25 @@ class Identifier:
             self.name = self.unresolved_name
         if not self.name:
             self.name = self.unresolved_name
-        if node.type == "field_expression":
-            og_node = node.parent
-            node = recursively_get_children_of_types(og_node, ['identifier'], index=parser.index,
-                                                                 check_list=parser.symbol_table["scope_map"])[0]
-        if full_ref.type == "field_expression":
+        #if node.type == "field_expression":
+        #    og_node = node.parent
+        #    node = recursively_get_children_of_types(og_node, ['identifier'], index=parser.index,
+        #                                                         check_list=parser.symbol_table["scope_map"])[0]
+        if full_ref.type in ["field_expression", "subscript_expression"]:
             self.field_parent_name = full_ref.named_children[0].text.decode()
         else:
             self.field_parent_name = None
-        variable_index = get_index(node, parser.index)
-        self.variable_scope = parser.symbol_table["scope_map"][variable_index]
-        if variable_index in parser.declaration_map:
-            self.scope = parser.symbol_table["scope_map"][parser.declaration_map[variable_index]]
-        else:
-            # self.scope = variable_scope
-            # Declaration does not exist hence it is given
-            # the outermost scope
-            self.scope = [0]
+        #variable_index = get_index(node, parser.index)
+        #self.variable_scope = parser.symbol_table["scope_map"][variable_index]
+        #if variable_index in parser.declaration_map:
+        #    self.scope = parser.symbol_table["scope_map"][parser.declaration_map[variable_index]]
+        #else:
+        #    # self.scope = variable_scope
+        #    # Declaration does not exist hence it is given
+        #    # the outermost scope
+        #    self.scope = [0]
+        #self.variable_scope = [0]
+        self.scope = [0]
         if line is not None:
             self.real_line_no = read_index(parser.index, line)[0][0]
 
@@ -302,16 +304,26 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
         current_node = used or defined
         if current_node is None:
             return
-        if current_node.type == "field_expression":
-            prev_node = current_node
-            current_node = recursively_get_children_of_types(current_node, ['identifier'], index=parser.index,
-                                                             check_list=parser.symbol_table["scope_map"])[-1]
+        if current_node.type in ["field_expression", "subscript_expression"]:
+            #prev_node = current_node
+            #current_node = recursively_get_children_of_types(current_node, ['identifier'], index=parser.index,
+            #                                                 check_list=parser.symbol_table["scope_map"])[-1]
+            current_node = current_node.named_children[0]
             if defined is not None:
                 defined = current_node
             else:
                 used = current_node
                 set_add(rda_table[statement_id]["use"],
                         Identifier(parser, used, full_ref=core, declaration=declaration, method_call=method_call))
+                if current_node.type == "subscript_expression":
+                    element = current_node.named_children[1].named_children[0]
+                    var_types = ["identifier", "this_expression", "field_expression", "subscript_expression"]
+                    if element.type == "identifier":
+                        set_add(rda_table[statement_id]["use"],
+                                Identifier(parser, element, declaration=declaration, method_call=method_call))
+                    else:
+                        for c in recursively_get_children_of_types(element, var_types):
+                            add_entry(parser, rda_table, statement_id, used=c, declaration=declaration)
         if (
                 current_node.parent is not None
                 # TODO: my comment out 
@@ -331,7 +343,7 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
                 current_node = current_node.parent
             while (
                     current_node.parent is not None
-                    and current_node.parent.type == "pointer_type"
+                    and current_node.parent.type == "subscript_expression"
             ):
                 current_node = current_node.parent
 
@@ -387,8 +399,8 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
     if st(core).startswith(system_type):
         return
     if defined is not None:
-        if get_index(defined, parser.index) not in parser.symbol_table["scope_map"]:
-            return
+        #if get_index(defined, parser.index) not in parser.symbol_table["scope_map"]:
+        #    return
         set_add(rda_table[statement_id]["def"],
                 Identifier(parser, defined, statement_id, full_ref=core, declaration=declaration,
                            method_call=method_call),
@@ -399,8 +411,8 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
                                method_call=method_call),
                     rda_table[-1])
     else:
-        if get_index(used, parser.index) not in parser.symbol_table["scope_map"]:
-            return
+        #if get_index(used, parser.index) not in parser.symbol_table["scope_map"]:
+        #    return
         if mapped_node is not None and method_call:
             set_add(rda_table[statement_id]["def"],
                     Identifier(parser, mapped_node, statement_id, full_ref=mapped_node, declaration=declaration,
@@ -884,13 +896,14 @@ def dfg_cpp(properties, CFG_results):
     variable_type = ['identifier', 'this_expression', "field_expression"] + element_access
 
     method_declaration = ['method_declaration']
-    handled_types = assignment + def_statement + increment_statement + method_calls + method_declaration + switch_type \
-                        + element_access
+    #handled_types = assignment + def_statement + increment_statement + method_calls + method_declaration + switch_type \
+    #                    + element_access
+    handled_types = assignment + def_statement + increment_statement + method_calls + method_declaration + switch_type 
 
     method_invocation = method_calls + ["object_creation_expression", "explicit_constructor_invocation"]
 
     call_variable_map = {}
-    handled_cases = ["case_statement", "declaration"] + ["class_declaration"] + ["function_definition"]
+    handled_cases = ["case_statement", "declaration"] + ["class_declaration"] + ["function_definition"] 
 
     # if_statement = ["if_statement", "else"]
     # for_statement = ["for_statement"]
@@ -1157,31 +1170,32 @@ def dfg_cpp(properties, CFG_results):
                                                                          check_list=parser.symbol_table["scope_map"])
                     for identifier in identifiers_used:
                         add_entry(parser, rda_table, parent_id, used=identifier)
-        elif root_node.type in element_access:
-            parent_statement = return_first_parent_of_types(root_node, statement_types["node_list_type"])
-            parent_id = get_index(parent_statement, index)
-            pointer = root_node.children[0]
-            if pointer.type in variable_type:
-                add_entry(parser, rda_table, parent_id, used=pointer)
-                add_entry(parser, rda_table, parent_id, defined=pointer)
-            else:
-                identifiers_used = recursively_get_children_of_types(pointer, variable_type, index=parser.index,
-                                                                     check_list=parser.symbol_table["scope_map"])
-                for identifier in identifiers_used:
-                    add_entry(parser, rda_table, parent_id, used=identifier)
-                    add_entry(parser, rda_table, parent_id, defined=identifier)
-            # NOTE: index: bracketed_argument_list -> argument -> xxx
-            ptr_index = root_node.children[1].children[0]
-            if ptr_index.type in variable_type:
-                add_entry(parser, rda_table, parent_id, used=ptr_index)
-                add_entry(parser, rda_table, parent_id, defined=ptr_index)
-            else:
-                identifiers_used = recursively_get_children_of_types(ptr_index, variable_type, index=parser.index,
-                                                                     check_list=parser.symbol_table["scope_map"])
-                for identifier in identifiers_used:
-                    add_entry(parser, rda_table, parent_id, used=identifier)
-                    add_entry(parser, rda_table, parent_id, defined=identifier)
-                
+        #elif root_node.type in element_access:
+        #    parent_statement = return_first_parent_of_types(root_node, statement_types["node_list_type"])
+        #    parent_id = get_index(parent_statement, index)
+        #    pointer = root_node.children[0]
+        #    print(pointer.type, pointer.text.decode())
+        #    if pointer.type in variable_type:
+        #        add_entry(parser, rda_table, parent_id, used=pointer)
+        #        add_entry(parser, rda_table, parent_id, defined=pointer)
+        #    else:
+        #        identifiers_used = recursively_get_children_of_types(pointer, variable_type, index=parser.index,
+        #                                                             check_list=parser.symbol_table["scope_map"])
+        #        for identifier in identifiers_used:
+        #            add_entry(parser, rda_table, parent_id, used=identifier)
+        #            add_entry(parser, rda_table, parent_id, defined=identifier)
+        #    # NOTE: index: bracketed_argument_list -> argument -> xxx
+        #    ptr_index = root_node.children[1].children[0]
+        #    if ptr_index.type in variable_type:
+        #        add_entry(parser, rda_table, parent_id, used=ptr_index)
+        #        add_entry(parser, rda_table, parent_id, defined=ptr_index)
+        #    else:
+        #        identifiers_used = recursively_get_children_of_types(ptr_index, variable_type, index=parser.index,
+        #                                                             check_list=parser.symbol_table["scope_map"])
+        #        for identifier in identifiers_used:
+        #            add_entry(parser, rda_table, parent_id, used=identifier)
+        #            add_entry(parser, rda_table, parent_id, defined=identifier)
+        #        
         elif root_node.type in increment_statement:
             parent_statement = return_first_parent_of_types(root_node, statement_types["node_list_type"])
             parent_id = get_index(parent_statement, index)
@@ -1275,7 +1289,7 @@ def dfg_cpp(properties, CFG_results):
                 else:
                     identifiers_used = recursively_get_children_of_types(node, variable_type, index=parser.index)
                     for identifier in identifiers_used:
-                        add_entry(parser, rda_table, cur_id, used=node)
+                        add_entry(parser, rda_table, cur_id, used=identifier)
         elif root_node.type == "for_each_statement":
             parent_statement = root_node
             parent_id = get_index(root_node, index)
@@ -1319,6 +1333,8 @@ def dfg_cpp(properties, CFG_results):
             # if root_node.type in variable_type:
             #     add_entry(parser, rda_table, parent_id, used=root_node)
             # else:
+            if root_node.type in variable_type:
+                add_entry(parser, rda_table, parent_id, used=root_node)
             identifiers_used = recursively_get_children_of_types(root_node, variable_type, stop_types=handled_types,
                                                                  index=parser.index,
                                                                  check_list=parser.symbol_table["scope_map"])
