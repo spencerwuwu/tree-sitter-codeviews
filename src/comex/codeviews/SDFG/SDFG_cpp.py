@@ -68,10 +68,14 @@ class Identifier:
         #    og_node = node.parent
         #    node = recursively_get_children_of_types(og_node, ['identifier'], index=parser.index,
         #                                                         check_list=parser.symbol_table["scope_map"])[0]
-        if full_ref.type in ["field_expression", "subscript_expression"]:
+        if full_ref.type in ["field_expression", "subscript_expression", "array_declarator"]:
             self.field_parent_name = full_ref.named_children[0].text.decode()
         else:
             self.field_parent_name = None
+        if node.type in ["subscript_expression", "array_declarator"]:
+            self.is_array = True
+        else:
+            self.is_array = False
         #variable_index = get_index(node, parser.index)
         #self.variable_scope = parser.symbol_table["scope_map"][variable_index]
         #if variable_index in parser.declaration_map:
@@ -304,7 +308,7 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
         current_node = used or defined
         if current_node is None:
             return
-        if current_node.type in ["field_expression", "subscript_expression"]:
+        if current_node.type in ["field_expression", "subscript_expression", "array_declarator"]:
             #prev_node = current_node
             #current_node = recursively_get_children_of_types(current_node, ['identifier'], index=parser.index,
             #                                                 check_list=parser.symbol_table["scope_map"])[-1]
@@ -315,7 +319,7 @@ def add_entry(parser, rda_table, statement_id, used=None, defined=None, declarat
                 used = current_node
                 set_add(rda_table[statement_id]["use"],
                         Identifier(parser, used, full_ref=core, declaration=declaration, method_call=method_call))
-                if current_node.type == "subscript_expression":
+                if current_node.type in ["subscript_expression", "array_declarator"]:
                     element = current_node.named_children[1].named_children[0]
                     var_types = ["identifier", "this_expression", "field_expression", "subscript_expression"]
                     if element.type == "identifier":
