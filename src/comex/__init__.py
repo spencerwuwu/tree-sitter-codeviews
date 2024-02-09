@@ -12,7 +12,7 @@ def get_language_map():
     grammar_repos = [
         ("https://github.com/tree-sitter/tree-sitter-java", "09d650def6cdf7f479f4b78f595e9ef5b58ce31e"),
         ("https://github.com/tree-sitter/tree-sitter-c-sharp", "3ef3f7f99e16e528e6689eae44dff35150993307"),
-        ("https://github.com/tree-sitter/tree-sitter-cpp", "ab1065fa23a43a447bd7e619a3af90253867af24"),
+        ("https://github.com/tree-sitter/tree-sitter-cpp", "2e4d27f7728a4f90f292e3d9fe27e51ce51ca426"),
     ]
     vendor_languages = []
 
