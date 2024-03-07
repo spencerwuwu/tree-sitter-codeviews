@@ -437,7 +437,7 @@ def check_field_name(req_child):
 
 
 def recursively_get_children_of_types(
-        node, st_types, check_list=None, index=None, result=None, stop_types=None
+        node, st_types, check_list=None, index=None, result=None, stop_types=None, debug_print=False
 ):
     if stop_types is None:
         stop_types = []
@@ -467,6 +467,8 @@ def recursively_get_children_of_types(
         for n in additional_cs:
             result.remove(n)
     for child in node.named_children:
+        if debug_print:
+            print("DEBUG", child.text.decode())
         if node.type == "parameter_declaration" and child == node.named_children[0]:
             continue
         if child in stop_types:
@@ -907,7 +909,7 @@ def dfg_cpp(properties, CFG_results):
     method_invocation = method_calls + ["object_creation_expression", "explicit_constructor_invocation"]
 
     call_variable_map = {}
-    handled_cases = ["case_statement", "declaration"] + ["class_declaration"] + ["function_definition"] 
+    handled_cases = ["case_statement", "declaration"] + ["class_declaration"] + ["function_definition"]  + ['for_statement']
 
     # if_statement = ["if_statement", "else"]
     # for_statement = ["for_statement"]
@@ -1294,13 +1296,28 @@ def dfg_cpp(properties, CFG_results):
                     identifiers_used = recursively_get_children_of_types(node, variable_type, index=parser.index)
                     for identifier in identifiers_used:
                         add_entry(parser, rda_table, cur_id, used=identifier)
-        elif root_node.type == "for_each_statement":
+        #elif root_node.type == "for_each_statement":
+        #    parent_statement = root_node
+        #    parent_id = get_index(root_node, index)
+        #    defined_node = parent_statement.child_by_field_name("left")
+        #    used_node = parent_statement.child_by_field_name("right")
+        #    add_entry(parser, rda_table, parent_id, defined=defined_node, declaration=True)
+        #    add_entry(parser, rda_table, parent_id, used=used_node)
+        elif root_node.type == "for_statement":
             parent_statement = root_node
             parent_id = get_index(root_node, index)
-            defined_node = parent_statement.child_by_field_name("left")
-            used_node = parent_statement.child_by_field_name("right")
-            add_entry(parser, rda_table, parent_id, defined=defined_node, declaration=True)
-            add_entry(parser, rda_table, parent_id, used=used_node)
+            # Init will be handled in assignment, so don't care here
+            # init = root_node.child_by_field_name("initializer")
+            condition = root_node.child_by_field_name("condition")
+            update = root_node.child_by_field_name("update")
+            for node in [condition, update]:
+                if condition.type in variable_type:
+                    add_entry(parser, rda_table, parent_id, used=node)
+                else:
+                    identifiers_used = recursively_get_children_of_types(node, variable_type, index=parser.index,
+                                                                         check_list=parser.symbol_table["scope_map"])
+                    for identifier in identifiers_used:
+                        add_entry(parser, rda_table, parent_id, used=identifier)
         else:
             # THIS ELSE IS VERY INEFFICIENT
             # Essentially considers all variable references as use
@@ -1339,10 +1356,17 @@ def dfg_cpp(properties, CFG_results):
             # else:
             if root_node.type in variable_type:
                 add_entry(parser, rda_table, parent_id, used=root_node)
+            if root_node.type == "for_statement":
+                debug_print = True
+            else:
+                debug_print = False
             identifiers_used = recursively_get_children_of_types(root_node, variable_type, stop_types=handled_types,
                                                                  index=parser.index,
-                                                                 check_list=parser.symbol_table["scope_map"])
+                                                                 check_list=parser.symbol_table["scope_map"],
+                                                                 debug_print=debug_print)
             for identifier in identifiers_used:
+                if root_node.type == "for_statement":
+                    print(identifier.type, identifier.text.decode())
                 add_entry(parser, rda_table, parent_id, used=identifier)
     # rda_solution = start_rda(index, rda_table, CFG_results)
     # # pp.pprint(rda_solution)
