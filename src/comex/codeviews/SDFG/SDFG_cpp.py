@@ -4,6 +4,7 @@ from collections import defaultdict
 import copy
 
 import pprint
+import signal
 
 import networkx as nx
 
@@ -22,6 +23,19 @@ debug = False
 #         x in os.environ for x in ("PYCHARM_HOSTED",)
 # ):
 #     debug = True
+
+class timeout:
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+        #raise Exception(self.error_message)
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.handle_timeout)
+        signal.alarm(self.seconds)
+    def __exit__(self, type, value, traceback):
+        signal.alarm(0)
 
 
 def scope_check(parent_scope, child_scope):
@@ -587,11 +601,24 @@ def start_rda(index, rda_table, graph, pre_solve=False):
                 else:
                     selective_difference.add(already_defined)
             new_result[node]["OUT"] = new_result[node]["OUT"].union(selective_difference)
-        ddiff = DeepDiff(
-            old_result,
-            new_result,
-            ignore_order=True,
-        )
+        #ddiff = DeepDiff(
+        #    old_result,
+        #    new_result,
+        #    ignore_order=True,
+        #)
+        try:
+            with timeout(seconds=5):
+                ddiff = DeepDiff(
+                    old_result,
+                    new_result,
+                    ignore_order=True,
+                )
+        except TimeoutError:
+            print(f"RDA: timeout in iteration")
+            raise TimeoutError("RDA: Timeout")
+        except:
+            exit(1)
+
         if ddiff == {}:
             # for node in nodes:
             #     all_defs = []
