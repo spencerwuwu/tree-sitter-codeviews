@@ -397,21 +397,22 @@ class CFGGraph_cpp(CFGGraph):
         types = ["scoped_type_identifier", "type_identifier", "generic_type"]
         if reference_node is None or reference_node.type == "this":
             class_name = None
-            while node is not None:
-                if node.type == "class_declaration":
-                    # class_index = self.get_index(node)
-                    class_name = list(filter(lambda child: child.type == "identifier", node.children))[0]
-                    class_name = [class_name.text.decode("UTF-8")]
-                    break
-                if node.type == "struct_declaration":
-                    class_name = list(filter(lambda child: child.type == "identifier", node.children))[0]
-                    class_name = [class_name.text.decode("UTF-8")]
-                if node.type == "function_definition":
-                    class_name = list(filter(lambda child: child.type == "function_declarator" or child.type == "pointer_declarator", node.children))[0]
-                    if class_name.type != "function_declarator":
-                        class_name = list(filter(lambda child: child.type == "function_declarator" or child.type == "pointer_declarator", node.children))[0]
-                    class_name = [class_name.children[0].text.decode("UTF-8")]
-                node = node.parent
+            # Just comment out as not using this feature
+            #while node is not None:
+            #    if node.type == "class_declaration":
+            #        # class_index = self.get_index(node)
+            #        class_name = list(filter(lambda child: child.type == "identifier", node.children))[0]
+            #        class_name = [class_name.text.decode("UTF-8")]
+            #        break
+            #    if node.type == "struct_declaration":
+            #        class_name = list(filter(lambda child: child.type == "identifier", node.children))[0]
+            #        class_name = [class_name.text.decode("UTF-8")]
+            #    if node.type == "function_definition":
+            #        class_name = list(filter(lambda child: child.type == "function_declarator" or child.type == "pointer_declarator", node.children))[0]
+            #        if class_name.type != "function_declarator":
+            #            class_name = list(filter(lambda child: child.type == "function_declarator" or child.type == "pointer_declarator", node.children))[0]
+            #        class_name = [class_name.children[0].text.decode("UTF-8")]
+            #    node = node.parent
 
             if class_name is None:
                 class_name = ["Unknown"]
@@ -1622,12 +1623,25 @@ class CFGGraph_cpp(CFGGraph):
                             for child_node in named_children:
                                 # Need to write a loop for unlimited layers of nesting
                                 if "compound_statement" in child_node.type:
-                                    block_node = child_node.named_children[0]
+                                    if len(child_node.named_children):
+                                        block_node = child_node.named_children[0]
                                     break
                                 else:
                                     if "label" not in child_node.type:
                                         block_node = child_node
                                         break
+
+                            if block_node is None:
+                                if next_case_node_index is None:
+                                    # This is the last block
+                                    self.add_edge(
+                                        source_index, next_dest_index, "switch_out"
+                                    )
+                                else:
+                                    for eq_case in self.records["switch_equivalent_map"][next_case_node_index]:
+                                        self.add_edge(source_index, eq_case, 'fall_through')
+                                continue
+
                             first_line_index = self.index[
                                 (
                                     block_node.start_point,
