@@ -1338,6 +1338,8 @@ def dfg_cpp(properties, CFG_results):
             condition = root_node.child_by_field_name("condition")
             update = root_node.child_by_field_name("update")
             for node in [condition, update]:
+                if node is None:
+                    continue
                 if condition.type in variable_type:
                     add_entry(parser, rda_table, parent_id, used=node)
                 else:
